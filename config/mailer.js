@@ -9,8 +9,8 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendOrderApprovalEmail = async (order, actionToken) => {
-  const acceptUrl = `http://localhost:5000/api/orders/action?token=${actionToken}&action=accept`;
-  const declineUrl = `http://localhost:5000/api/orders/action?token=${actionToken}&action=decline`;
+  const acceptUrl = `https://qcu-coop-api.onrender.com/api/orders/action?token=${actionToken}&action=accept`;
+  const declineUrl = `https://qcu-coop-api.onrender.com/api/orders/action?token=${actionToken}&action=decline`;
 
   const html = `
     <!DOCTYPE html>

@@ -49,32 +49,49 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// LOGIN
+// LOGIN — handles both regular login and order verification
 router.post('/login', async (req, res) => {
-  const { student_id, password } = req.body;
-  const user = await User.findOne({ student_id });
-  if (!user) return res.status(400).json({ error: 'Student ID not found' });
+  try {
+    const { student_id, password } = req.body;
+    
+    // FIX: Ignore any existing token - this is a fresh login attempt
+    console.log('🔓 Login attempt for student_id:', student_id);
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(400).json({ error: 'Incorrect password' });
-
-  const token = jwt.sign(
-    { id: user._id, role: user.role, student_id: user.student_id },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  res.json({
-    token,
-    user: {
-      id: user._id,
-      student_id: user.student_id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      role: user.role,
+    const user = await User.findOne({ student_id });
+    if (!user) {
+      return res.status(400).json({ error: 'Student ID not found' });
     }
-  });
+
+    // Compare password with hashed password
+    const match = await bcrypt.compare(password, user.password);
+    console.log(`Password match for ${student_id}:`, match);
+    
+    if (!match) {
+      return res.status(400).json({ error: 'Incorrect password' });
+    }
+
+    // Generate new token
+    const token = jwt.sign(
+      { id: user._id, role: user.role, student_id: user.student_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        student_id: user.student_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
 });
 
 // GET current user (protected)
@@ -146,7 +163,6 @@ router.post('/create-admin', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 module.exports = router;
 module.exports.verifyToken = verifyToken;

@@ -13,8 +13,10 @@ const OrderSchema = new mongoose.Schema({
     subtotal:     { type: Number },
   }],
   total_amount: { type: Number, required: true },
-  status: { type: String, enum: ['Pending', 'Approved', 'Declined', 'Accepted', 'Cancelled', 'Completed'],default: 'Pending'}, actionToken: { type: String, default: '' },
+  status: { type: String, enum: ['Pending', 'Approved', 'Declined', 'Accepted', 'Cancelled', 'Completed'], default: 'Pending'}, 
+  actionToken: { type: String, default: '' },
   admin_note:   { type: String, default: '' },
+  completedAt:  { type: Date, default: null }, // NEW: Track when order was marked as completed
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', OrderSchema);

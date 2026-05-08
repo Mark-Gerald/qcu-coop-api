@@ -6,20 +6,14 @@ const { sendOrderApprovalEmail, sendOrderDeclineEmail } = require('../config/mai
 const crypto = require('crypto');
 
 // POST place an order (student)
-router.get('/my', verifyToken, async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    // Auto-delete completed orders older than 1 day
-    await Order.deleteMany({
-      status: 'Completed',
-      createdAt: { $lt: oneDayAgo }
-    });
-    
-    const orders = await Order.find({ student_id: req.user.student_id }).sort({ createdAt: -1 });
-    res.json(orders);
+    const order = new Order(req.body);
+    await order.save();
+    res.json(order);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get orders' });
+    console.error('Place order error:', err);
+    res.status(500).json({ error: 'Failed to place order' });
   }
 });
 
@@ -37,6 +31,7 @@ router.get('/my', verifyToken, async (req, res) => {
     const orders = await Order.find({ student_id: req.user.student_id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
+    console.error('Get my orders error:', err);
     res.status(500).json({ error: 'Failed to get orders' });
   }
 });
@@ -88,11 +83,12 @@ router.get('/', verifyToken, async (req, res) => {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
+    console.error('Get all orders error:', err);
     res.status(500).json({ error: 'Failed to get orders' });
   }
 });
 
-// NEW: Admin mark as completed or cancel
+// Admin mark as completed
 router.put('/:id/complete', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   try {
@@ -100,18 +96,18 @@ router.put('/:id/complete', verifyToken, async (req, res) => {
       req.params.id,
       { 
         status: 'Completed',
-        completedAt: new Date() // Track when it was completed
+        completedAt: new Date()
       },
-      { returnDocument: 'after' }
+      { new: true }
     );
     res.json(order);
   } catch (err) {
+    console.error('Complete order error:', err);
     res.status(500).json({ error: 'Failed to complete order' });
   }
 });
 
-
-// Update the PUT /:id route:
+// Update order status (Approve/Decline)
 router.put('/:id', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   const { status, admin_note } = req.body;
@@ -126,14 +122,14 @@ router.put('/:id', verifyToken, async (req, res) => {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { returnDocument: 'after' }
+      { new: true }
     );
 
     console.log('Order updated. Status:', order.status, '| Token:', order.actionToken || 'none');
 
     if (status === 'Approved') {
       for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.product_id, { $inc: { stock: -item.quantity } }, { returnDocument: 'after' });
+        await Product.findByIdAndUpdate(item.product_id, { $inc: { stock: -item.quantity } }, { new: true });
       }
       try {
         await sendOrderApprovalEmail(order, order.actionToken);
@@ -154,7 +150,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     res.json(order);
   } catch (err) {
-    console.error(err);
+    console.error('Update order error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

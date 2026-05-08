@@ -6,19 +6,34 @@ const { sendOrderApprovalEmail, sendOrderDeclineEmail } = require('../config/mai
 const crypto = require('crypto');
 
 // POST place an order (student)
-router.post('/', verifyToken, async (req, res) => {
+router.get('/my', verifyToken, async (req, res) => {
   try {
-    const order = new Order(req.body);
-    await order.save();
-    res.json(order);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Auto-delete completed orders older than 1 day
+    await Order.deleteMany({
+      status: 'Completed',
+      createdAt: { $lt: oneDayAgo }
+    });
+    
+    const orders = await Order.find({ student_id: req.user.student_id }).sort({ createdAt: -1 });
+    res.json(orders);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to place order' });
+    res.status(500).json({ error: 'Failed to get orders' });
   }
 });
 
 // GET my orders (student - filtered by student_id)
 router.get('/my', verifyToken, async (req, res) => {
   try {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Auto-delete completed orders older than 1 day
+    await Order.deleteMany({
+      status: 'Completed',
+      createdAt: { $lt: oneDayAgo }
+    });
+    
     const orders = await Order.find({ student_id: req.user.student_id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
@@ -62,6 +77,14 @@ router.get('/action', async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   try {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Auto-delete completed orders older than 1 day
+    await Order.deleteMany({
+      status: 'Completed',
+      createdAt: { $lt: oneDayAgo }
+    });
+    
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
@@ -75,7 +98,10 @@ router.put('/:id/complete', verifyToken, async (req, res) => {
   try {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
-      { status: 'Completed' },
+      { 
+        status: 'Completed',
+        completedAt: new Date() // Track when it was completed
+      },
       { returnDocument: 'after' }
     );
     res.json(order);
